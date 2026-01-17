@@ -1,0 +1,6 @@
+{
+  "Group": "com.nations",
+  "Name": "NationsPlugin",
+  "Version": "1.0.0",
+  "Main": "com.nations.plugin.NationsPlugin"
+}
