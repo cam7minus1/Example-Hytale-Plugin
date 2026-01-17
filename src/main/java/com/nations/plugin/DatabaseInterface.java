@@ -1,5 +1,6 @@
 package com.nations.plugin;
 
+
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
@@ -90,15 +91,8 @@ public class DatabaseInterface {
     public void runAllSqlFiles(String folderName) throws Exception {
         System.out.println("[DB] Loading SQL folder: " + folderName);
 
-        // We have to do this in order because some sql files have foreign keys
-        // that are other sql files check the refences I sent over discord
         String[] orderedFiles = new String[] {
-                "Users.sql",      // must be first
-                "Nations.sql",    // depends on Users
-                "Cities.sql",     // depends on Nations
-                "Blocks.sql",     // depends on Cities + Nations
-                "UsersList.sql",   // depends on Users + Nations + Cities
-                "Tests.sql"
+                "Blocks.sql"
         };
 
         for (String fileName : orderedFiles) {

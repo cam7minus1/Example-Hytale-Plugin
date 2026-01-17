@@ -14,13 +14,13 @@ public class NationsPlugin extends JavaPlugin {
 
         super(init);
 
-        String host = "localhost";
-        String user = "root";
-        String dataBase = "nations";
-        String password = "password";
-        int port = 3306;
-
-        this.db = new DatabaseInterface(host, port, dataBase, user, password);
+//        String host = "localhost";
+//        String user = "root";
+//        String dataBase = "nations";
+//        String password = "password";
+//        int port = 3306;
+//
+//        this.db = new DatabaseInterface(host, port, dataBase, user, password);
 
     }
 
@@ -28,5 +28,6 @@ public class NationsPlugin extends JavaPlugin {
     protected void setup(){
         super.setup();;
         this.getCommandRegistry().registerCommand(new NationCommand("hello", "An example command", false));
+        EventListener.register(this);
     }
 }
