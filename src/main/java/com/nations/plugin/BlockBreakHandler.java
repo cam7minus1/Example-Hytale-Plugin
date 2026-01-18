@@ -1,5 +1,7 @@
 package com.nations.plugin;
 
+import com.hypixel.hytale.server.core.event.events.ecs.BreakBlockEvent;
+
 public class BlockBreakHandler {
 
     DatabaseInterface db;
@@ -7,7 +9,7 @@ public class BlockBreakHandler {
         this.db = db;
     }
 
-    public void destroyBlock(){
+    public void destroyBlock(BreakBlockEvent event){
 
     }
 

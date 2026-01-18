@@ -13,8 +13,11 @@ import com.hypixel.hytale.component.Archetype;
 public class BlockBreakListener extends EntityEventSystem<EntityStore, BreakBlockEvent> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    public BlockBreakListener() {
+    public NationsPlugin plugin;
+
+    public BlockBreakListener(NationsPlugin plugin) {
         super(BreakBlockEvent.class);
+        this.plugin = plugin;
     }
 
     @Override
@@ -24,6 +27,7 @@ public class BlockBreakListener extends EntityEventSystem<EntityStore, BreakBloc
                           CommandBuffer<EntityStore> commandBuffer,
                           BreakBlockEvent event) {
         LOGGER.atInfo().log("Block broken at: " + event.getTargetBlock().toString());
+        plugin.blockBreakhandler.destroyBlock(event);
     }
 
     @Override

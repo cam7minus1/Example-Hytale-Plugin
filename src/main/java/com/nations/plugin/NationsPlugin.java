@@ -36,7 +36,7 @@ public class NationsPlugin extends JavaPlugin {
     protected void start() {
         super.start();
         getEntityStoreRegistry().registerSystem(
-                new BlockBreakListener()
+                new BlockBreakListener(this)
         );
     }
 }

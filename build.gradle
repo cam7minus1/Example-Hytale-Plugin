@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group = 'org.example'
+group = 'com.nations'
 version = '1.0-SNAPSHOT'
 
 repositories {
@@ -10,10 +10,28 @@ repositories {
 }
 
 dependencies {
-    compileOnly(files("libs/HytaleServer.jar"))
+    implementation 'com.mysql:mysql-connector-j:9.1.0'
+    compileOnly files("libs/HytaleServer.jar")
+
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+    from {
+        configurations.runtimeClasspath.collect { zipTree(it) }
+    } {
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+    }
+
+    manifest {
+        attributes 'Main-Class': 'com.nations.plugin.NationsPlugin'
+    }
 }
 
 test {

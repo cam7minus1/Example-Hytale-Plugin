@@ -1,9 +1,7 @@
 package com.nations.plugin;
 
 
-import java.io.File;
 import java.io.InputStream;
-import java.net.URL;
 import java.sql.*;
 
 public class DatabaseInterface {
@@ -16,6 +14,15 @@ public class DatabaseInterface {
     private Connection connection;
 
     public DatabaseInterface(String host, int port, String database, String user, String password) {
+
+        // This part here is essential due to some issues with hytale loading
+        // dependencies...
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");  // Force load
+        } catch (ClassNotFoundException e) {
+            System.out.println("ERROR MySQL driver class not found " + e);
+        }
+
         this.url = "jdbc:mysql://" + host + ":" + port + "/" + database
                 + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
         this.user = user;
