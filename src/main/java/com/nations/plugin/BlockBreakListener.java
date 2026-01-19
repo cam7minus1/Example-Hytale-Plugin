@@ -4,19 +4,19 @@ import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.EntityEventSystem;
-import com.hypixel.hytale.server.core.event.events.ecs.BreakBlockEvent;
+import com.hypixel.hytale.server.core.event.events.ecs.DamageBlockEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.Archetype;
 
-public class BlockBreakListener extends EntityEventSystem<EntityStore, BreakBlockEvent> {
+public class BlockBreakListener extends EntityEventSystem<EntityStore, DamageBlockEvent> {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     public NationsPlugin plugin;
 
     public BlockBreakListener(NationsPlugin plugin) {
-        super(BreakBlockEvent.class);
+        super(DamageBlockEvent.class);
         this.plugin = plugin;
     }
 
@@ -25,7 +25,7 @@ public class BlockBreakListener extends EntityEventSystem<EntityStore, BreakBloc
                           ArchetypeChunk<EntityStore> archetypeChunk,
                           Store<EntityStore> store,
                           CommandBuffer<EntityStore> commandBuffer,
-                          BreakBlockEvent event) {
+                          DamageBlockEvent event) {
         LOGGER.atInfo().log("Block broken at: " + event.getTargetBlock().toString());
         plugin.blockBreakhandler.destroyBlock(event);
     }
