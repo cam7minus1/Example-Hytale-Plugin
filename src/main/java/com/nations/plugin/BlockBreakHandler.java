@@ -7,12 +7,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class BlockBreakHandler {
     private final DatabaseInterface db;
     private final Connection conn;
     private final Map<String, Long> lastActionTime = new HashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public BlockBreakHandler(DatabaseInterface db) {
         this.db = db;
@@ -20,6 +25,19 @@ public class BlockBreakHandler {
             this.conn = db.getConnection();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to get DB connection", e);
+        }
+        scheduler.scheduleAtFixedRate(this::cleanupMap, 5, 5, TimeUnit.MINUTES);
+    }
+
+    private void cleanupMap() {
+        long now = System.currentTimeMillis();
+        Iterator<Map.Entry<String, Long>> iterator = lastActionTime.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Long> entry = iterator.next();
+            if (now - entry.getValue() > 30000) { // 30 seconds
+                System.out.println("Removing old destroy debounces");
+                iterator.remove();
+            }
         }
     }
 

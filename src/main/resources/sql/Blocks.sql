@@ -5,6 +5,6 @@ CREATE TABLE reinforced_blocks (
    x INT NOT NULL,
    y INT NOT NULL,
    z INT NOT NULL,
-   health INT NOT NULL DEFAULT 5,
+   health INT NOT NULL DEFAULT 3,
    PRIMARY KEY (world, x, y, z)
 );
