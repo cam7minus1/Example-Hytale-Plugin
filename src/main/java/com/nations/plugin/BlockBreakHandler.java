@@ -1,5 +1,7 @@
 package com.nations.plugin;
 
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.ecs.DamageBlockEvent;
 import com.hypixel.hytale.math.vector.Vector3i;
 import java.sql.Connection;
@@ -41,7 +43,7 @@ public class BlockBreakHandler {
         }
     }
 
-    public void destroyBlock(DamageBlockEvent event) {
+    public void destroyBlock(DamageBlockEvent event, Player player) {
         Vector3i pos = event.getTargetBlock();
         String world = "world";
         String key = world + "_" + pos.x + "_" + pos.y + "_" + pos.z;
@@ -94,6 +96,7 @@ public class BlockBreakHandler {
                 update.setInt(4, pos.y);
                 update.setInt(5, pos.z);
                 update.executeUpdate();
+                player.sendMessage(Message.raw("Block health "+newHealth+" HP"));
             }
 
             if (newHealth > 0) {
