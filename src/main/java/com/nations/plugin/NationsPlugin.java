@@ -90,7 +90,7 @@ public class NationsPlugin extends JavaPlugin {
                 writer.write("dbName: nations\n\n");
 
                 writer.write("# Reinforce settings\n");
-                writer.write("secondsPerHp: 10\n");
+                writer.write("hitsPerHp: 20\n");
 
             } catch (IOException e) {
                 System.err.println("[NationsPlugin] Failed to write properties.yml");
@@ -126,7 +126,7 @@ public class NationsPlugin extends JavaPlugin {
                     "dbUser", "root",
                     "dbPassword", "password",
                     "dbName", "nations",
-                    "secondsPerHp", 10
+                    "hitsPerHp", 10
             );
         }
     }

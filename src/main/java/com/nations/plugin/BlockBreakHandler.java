@@ -30,13 +30,17 @@ public class BlockBreakHandler {
 
     private final DatabaseInterface db;
     private final Connection conn;
-    private final Map<String, Long> lastActionTime = new HashMap<>();
+
+    // OLD: lastActionTime (timer-based)
+    // NEW: hit counter + last-hit timestamp for cleanup
+    private final Map<String, Integer> hitCounts = new HashMap<>();
+    private final Map<String, Long> lastHitTime = new HashMap<>();
+
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private InventoryInterface inventoryInterface;
 
-    // NEW FIELDS
     private Map<String, Integer> reinforceValues = new HashMap<>();
-    private int secondsPerHp = 10;
+    private int hitsPerHp = 10; // NOW MEANS: hits required per HP
 
     public BlockBreakHandler(DatabaseInterface db) {
 
@@ -49,20 +53,26 @@ public class BlockBreakHandler {
         }
 
         inventoryInterface = new InventoryInterface();
+
+        // Cleanup old hit counters every 5 minutes
         scheduler.scheduleAtFixedRate(this::cleanupMap, 5, 5, TimeUnit.MINUTES);
 
-        // Load YAML config files
         loadReinforceConfig();
     }
 
     private void cleanupMap() {
         long now = System.currentTimeMillis();
-        Iterator<Map.Entry<String, Long>> iterator = lastActionTime.entrySet().iterator();
+        Iterator<Map.Entry<String, Long>> iterator = lastHitTime.entrySet().iterator();
+
         while (iterator.hasNext()) {
             Map.Entry<String, Long> entry = iterator.next();
-            if (now - entry.getValue() > 30000) { // 30 seconds
-                System.out.println("Removing old destroy debounces");
+
+            // If no hit in 30 seconds → remove hit counter + timestamp
+            if (now - entry.getValue() > 30000) {
+                String key = entry.getKey();
+                System.out.println("[Reinforce] Cleaning stale hit counter for " + key);
                 iterator.remove();
+                hitCounts.remove(key);
             }
         }
     }
@@ -76,9 +86,6 @@ public class BlockBreakHandler {
             return;
         }
 
-        // -----------------------------
-        // Load properties.yml
-        // -----------------------------
         File propertiesFile = new File(folder, "properties.yml");
 
         if (propertiesFile.exists()) {
@@ -86,14 +93,14 @@ public class BlockBreakHandler {
                 Yaml yaml = new Yaml();
                 Map<String, Object> data = yaml.load(fis);
 
-                if (data != null && data.containsKey("secondsPerHp")) {
-                    Object val = data.get("secondsPerHp");
+                if (data != null && data.containsKey("hitsPerHp")) {
+                    Object val = data.get("gitsPerHp");
                     if (val instanceof Number) {
-                        secondsPerHp = ((Number) val).intValue();
+                        hitsPerHp = ((Number) val).intValue();
                     }
                 }
 
-                System.out.println("[BlockBreakHandler] Loaded secondsPerHp = " + secondsPerHp);
+                System.out.println("[BlockBreakHandler] Loaded hitsPerHP (hitsPerHp) = " + hitsPerHp);
 
             } catch (Exception e) {
                 System.err.println("[BlockBreakHandler] Failed to load properties.yml");
@@ -101,9 +108,6 @@ public class BlockBreakHandler {
             }
         }
 
-        // -----------------------------
-        // Load reinforceBlocks.yml
-        // -----------------------------
         File reinforceFile = new File(folder, "reinforceBlocks.yml");
 
         if (reinforceFile.exists()) {
@@ -128,7 +132,11 @@ public class BlockBreakHandler {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // MAIN FUNCTION — NOW USING HIT COUNTERS INSTEAD OF TIMERS
+    // -------------------------------------------------------------------------
     public void destroyBlock(DamageBlockEvent event, Player player) {
+
         Vector3i pos = event.getTargetBlock();
         String world = "world";
         String key = world + "_" + pos.x + "_" + pos.y + "_" + pos.z;
@@ -145,9 +153,7 @@ public class BlockBreakHandler {
         int health = 0;
         boolean exists = false;
 
-        // ---------------------------------------------------------
-        // LOAD HEALTH FROM DB
-        // ---------------------------------------------------------
+        // Load health
         try (PreparedStatement select = conn.prepareStatement(
                 "SELECT health FROM reinforced_blocks WHERE world = ? AND x = ? AND y = ? AND z = ?")) {
 
@@ -168,9 +174,7 @@ public class BlockBreakHandler {
             return;
         }
 
-        // ---------------------------------------------------------
-        // 1. STICK CHECK
-        // ---------------------------------------------------------
+        // Stick check
         if (itemName.equals("Ingredient_Stick")) {
             System.out.println("[Reinforce] Stick check at " + key + " health=" + health);
             player.sendMessage(Message.raw("Block health: " + health));
@@ -178,9 +182,7 @@ public class BlockBreakHandler {
             return;
         }
 
-        // ---------------------------------------------------------
-        // 2. REINFORCE ITEM
-        // ---------------------------------------------------------
+        // Reinforce item
         if (reinforceAmount != null) {
 
             if (!exists) {
@@ -231,10 +233,10 @@ public class BlockBreakHandler {
                 }
             }
 
-            boolean success = inventoryInterface.removePlayerItem(player, itemName, reinforceAmount);
+            boolean success = inventoryInterface.removePlayerItem(player, itemName, 1);
 
-            if (!success){
-                System.out.println("User did not have enough resources needed "+itemName+" "+reinforceAmount);
+            if (!success) {
+                System.out.println("User did not have enough resources needed " + itemName + " " + reinforceAmount);
                 return;
             }
 
@@ -243,38 +245,36 @@ public class BlockBreakHandler {
             return;
         }
 
-        // ---------------------------------------------------------
-        // 3. NORMAL HIT
-        // ---------------------------------------------------------
-
+        // Unreinforced block → break normally
         if (!exists) {
             System.out.println("[Reinforce] Normal hit on unreinforced block at " + key + " → allow break");
             return;
         }
 
-        Long last = lastActionTime.get(key);
+        // ---------------------------------------------------------------------
+        // HIT COUNTER LOGIC (REPLACES TIMER)
+        // ---------------------------------------------------------------------
 
-        // First touch → start timer, NO DAMAGE
-        if (last == null) {
-            lastActionTime.put(key, now);
-            System.out.println("[Reinforce] First touch at " + key + " → start 10s timer");
+        // Update last-hit timestamp
+        lastHitTime.put(key, now);
+
+        // Increment hit counter
+        int hits = hitCounts.getOrDefault(key, 0) + 1;
+        hitCounts.put(key, hits);
+
+        System.out.println("[Reinforce] Hit " + hits + "/" + hitsPerHp + " on " + key);
+
+        // Not enough hits yet → cancel break
+        if (hits < hitsPerHp) {
             event.setCancelled(true);
             return;
         }
 
-        // Not enough time passed → cancel
-        if (now - last < 10000) {
-            System.out.println("[Reinforce] Debounce hit at " + key + " → cancel");
-            event.setCancelled(true);
-            return;
-        }
-
-        // Enough time passed → apply damage
-        lastActionTime.put(key, now);
+        // Enough hits → apply damage
+        hitCounts.put(key, 0); // reset counter
 
         int newHealth = health - 1;
 
-        // Update DB
         try (PreparedStatement update = conn.prepareStatement(
                 "UPDATE reinforced_blocks SET health = ? WHERE world = ? AND x = ? AND y = ? AND z = ?")) {
 
@@ -296,9 +296,7 @@ public class BlockBreakHandler {
 
         player.sendMessage(Message.raw("Block health " + newHealth + " HP"));
 
-        // ---------------------------------------------------------
-        // HP <= 0 → ALLOW BREAK
-        // ---------------------------------------------------------
+        // HP <= 0 → allow break
         if (newHealth <= 0) {
 
             try (PreparedStatement delete = conn.prepareStatement(
@@ -316,16 +314,15 @@ public class BlockBreakHandler {
                 System.err.println("[Reinforce] DB error deleting block: " + e.getMessage());
             }
 
-            lastActionTime.remove(key);
-            System.out.println("[Reinforce] Debounce cleared for " + key);
+            hitCounts.remove(key);
+            lastHitTime.remove(key);
 
+            System.out.println("[Reinforce] Hit counter cleared for " + key);
             System.out.println("[Reinforce] Block HP <= 0 at " + key + " → allow break");
             return;
         }
 
-        // ---------------------------------------------------------
-        // HP > 0 → CANCEL BREAK
-        // ---------------------------------------------------------
+        // Still reinforced → cancel break
         System.out.println("[Reinforce] Block still reinforced at " + key + " → cancel break");
         event.setCancelled(true);
     }
