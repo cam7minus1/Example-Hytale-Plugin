@@ -7,9 +7,7 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 
 public class InventoryInterface {
 
-    InventoryInterface(){
-
-    }
+    InventoryInterface(){}
 
     void givePlayerItem(Player player, String itemName, int amount){
         // 1. Get the player's inventory
@@ -26,74 +24,75 @@ public class InventoryInterface {
     }
 
     boolean removePlayerItem(Player player, String itemName, int amount) {
-        Inventory inventory = player.getInventory();
+        Inventory inv = player.getInventory();
 
-        ItemContainer[] containers = new ItemContainer[] {
-                inventory.getHotbar(),
-                inventory.getStorage(),
-                inventory.getArmor(),
-                inventory.getUtility(),
-                inventory.getBackpack()
-        };
+        ItemContainer hotbar = inv.getHotbar();
+        ItemContainer storage = inv.getStorage();
 
-        // -------------------------
-        // FIRST PASS: Count total
-        // -------------------------
-        int total = 0;
+        ItemContainer[] containers = new ItemContainer[] { hotbar, storage };
 
-        for (ItemContainer container : containers) {
-            short cap = container.getCapacity();
+        int needed = amount;
 
+        // First pass: count total available
+        int totalFound = 0;
+
+        for (ItemContainer c : containers) {
+            if (c == null) continue;
+
+            int cap = c.getCapacity();
             for (short slot = 0; slot < cap; slot++) {
-                ItemStack stack = container.getItemStack(slot);
-                if (stack == null) continue;
-                if (!stack.getItemId().equals(itemName)) continue;
+                ItemStack s = c.getItemStack(slot);
+                if (s == null) continue;
 
-                total += stack.getQuantity();
-                if (total >= amount) break;
-            }
-
-            if (total >= amount) break;
-        }
-
-        // Not enough → fail without touching inventory
-        if (total < amount) {
-            return false;
-        }
-
-        // -------------------------
-        // SECOND PASS: Remove stacks
-        // -------------------------
-        int remaining = amount;
-
-        for (ItemContainer container : containers) {
-            short cap = container.getCapacity();
-
-            for (short slot = 0; slot < cap; slot++) {
-                ItemStack stack = container.getItemStack(slot);
-                if (stack == null) continue;
-                if (!stack.getItemId().equals(itemName)) continue;
-
-                int qty = stack.getQuantity();
-
-                if (qty <= remaining) {
-                    // Remove entire stack
-                    container.removeItemStack(stack);
-                    remaining -= qty;
-
-                    if (remaining == 0) {
-                        return true;
-                    }
-                } else {
-                    // We would need to remove only part of this stack,
-                    // but the API does NOT allow modifying quantity.
-                    // Therefore: atomic rule → fail.
-                    return false;
+                if (s.getItemId().equals(itemName)) {
+                    totalFound += s.getQuantity();
+                    if (totalFound >= needed) break;
                 }
             }
+
+            if (totalFound >= needed) break;
         }
 
-        return true; // logically unreachable after first-pass guarantee
+        if (totalFound < needed) {
+            return false; // not enough items
+        }
+
+        // Second pass: remove exactly N items
+        int remaining = needed;
+
+        for (ItemContainer c : containers) {
+            if (c == null) continue;
+
+            int cap = c.getCapacity();
+            for (short slot = 0; slot < cap; slot++) {
+                if (remaining <= 0) break;
+
+                ItemStack s = c.getItemStack(slot);
+                if (s == null) continue;
+
+                if (!s.getItemId().equals(itemName)) continue;
+
+                int qty = s.getQuantity();
+
+                // Remove the whole stack
+                c.removeItemStackFromSlot(slot);
+
+                if (qty > remaining) {
+                    // Create leftover stack
+                    int leftover = qty - remaining;
+                    ItemStack newStack = s.withQuantity(leftover);
+
+                    // Add leftover back to the SAME container
+                    c.addItemStack(newStack);
+                }
+
+                remaining -= qty;
+            }
+
+            if (remaining <= 0) break;
+        }
+
+        return true;
     }
 
 }

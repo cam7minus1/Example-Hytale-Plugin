@@ -69,7 +69,7 @@ public class BlockBreakHandler {
 
     @SuppressWarnings("unchecked")
     private void loadReinforceConfig() {
-        File folder = new File("HynationsReinforce");
+        File folder = new File("mods/HynationsReinforce");
 
         if (!folder.exists()) {
             System.err.println("[BlockBreakHandler] Reinforce folder missing: " + folder.getAbsolutePath());
@@ -169,7 +169,7 @@ public class BlockBreakHandler {
         }
 
         // ---------------------------------------------------------
-        // 1. STICK CHECK (Ingredient_Stick)
+        // 1. STICK CHECK
         // ---------------------------------------------------------
         if (itemName.equals("Ingredient_Stick")) {
             System.out.println("[Reinforce] Stick check at " + key + " health=" + health);
@@ -231,7 +231,12 @@ public class BlockBreakHandler {
                 }
             }
 
-            inventoryInterface.removePlayerItem(player, itemName, 1);
+            boolean success = inventoryInterface.removePlayerItem(player, itemName, reinforceAmount);
+
+            if (!success){
+                System.out.println("User did not have enough resources needed "+itemName+" "+reinforceAmount);
+                return;
+            }
 
             player.sendMessage(Message.raw("Reinforced block. New health: " + health));
             event.setCancelled(true);
@@ -239,22 +244,32 @@ public class BlockBreakHandler {
         }
 
         // ---------------------------------------------------------
-        // 3. NORMAL HIT (not stick, not reinforce)
+        // 3. NORMAL HIT
         // ---------------------------------------------------------
 
-        // If block is not reinforced → break normally
         if (!exists) {
             System.out.println("[Reinforce] Normal hit on unreinforced block at " + key + " → allow break");
             return;
         }
 
-        // Debounce
         Long last = lastActionTime.get(key);
-        if (last != null && now - last < 10000) {
+
+        // First touch → start timer, NO DAMAGE
+        if (last == null) {
+            lastActionTime.put(key, now);
+            System.out.println("[Reinforce] First touch at " + key + " → start 10s timer");
+            event.setCancelled(true);
+            return;
+        }
+
+        // Not enough time passed → cancel
+        if (now - last < 10000) {
             System.out.println("[Reinforce] Debounce hit at " + key + " → cancel");
             event.setCancelled(true);
             return;
         }
+
+        // Enough time passed → apply damage
         lastActionTime.put(key, now);
 
         int newHealth = health - 1;
@@ -286,7 +301,6 @@ public class BlockBreakHandler {
         // ---------------------------------------------------------
         if (newHealth <= 0) {
 
-            // Delete DB entry
             try (PreparedStatement delete = conn.prepareStatement(
                     "DELETE FROM reinforced_blocks WHERE world = ? AND x = ? AND y = ? AND z = ?")) {
 
@@ -302,11 +316,9 @@ public class BlockBreakHandler {
                 System.err.println("[Reinforce] DB error deleting block: " + e.getMessage());
             }
 
-            // Clear debounce
             lastActionTime.remove(key);
             System.out.println("[Reinforce] Debounce cleared for " + key);
 
-            // Allow break
             System.out.println("[Reinforce] Block HP <= 0 at " + key + " → allow break");
             return;
         }
